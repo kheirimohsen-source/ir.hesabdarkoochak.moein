@@ -1,31 +1,43 @@
-name: Build Android APK
+name: Build and Sign Release APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
-      - name: Build APK with Gradle
-        run: ./gradlew assembleDebug
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+    - name: Generate Keystore & Sign APK
+      run: |
+        keytool -genkeypair -v -keystore release.jks -alias moein_key -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Moein, OU=App, O=Hesabdar, L=Tehran, S=Tehran, C=IR"
+        $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 app/build/outputs/apk/release/app-release-unsigned.apk app-release-aligned.apk
+        $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.jks --ks-pass pass:123456 --key-pass pass:123456 --out hesabdarkoochak-moein-release.apk app-release-aligned.apk
+
+    - name: Upload Signed Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Signed-Release-APK
+        path: hesabdarkoochak-moein-release.apk
+
+    - name: Upload Keystore (دانلود و نگهداری کنید)
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-release-keystore
+        path: release.jks
